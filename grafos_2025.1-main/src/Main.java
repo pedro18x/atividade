@@ -4,7 +4,7 @@ public class Main {
     public static void main(String[] args) {
         // Criar um grafo
         Grafo g = new Grafo();
-        g.setDirecionado(true); // Corrigido: setDirecionado em vez de setIsDirecionado
+        g.setDirecionado(true);
 
         // Criar vértices
         Vertice v1 = new Vertice("A");

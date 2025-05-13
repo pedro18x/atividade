@@ -3,7 +3,7 @@ import lombok.Setter;
 import lombok.Getter;
 
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @NoArgsConstructor
 @Setter
@@ -162,12 +162,11 @@ public class Grafo {
         }
 
         // Verifica se o caminho começa com a origem
-        return caminho.size() > 0 && caminho.getFirst().equals(origem) ? caminho : new LinkedList<>();
+        return !caminho.isEmpty() && caminho.getFirst().equals(origem) ? caminho : new LinkedList<>();
     }
 
-    /**
-     * NOVA ADIÇÃO: Identificar o caminho de menor comprimento usando Dijkstra
-     */
+
+
     public List<Vertice> encontrarCaminhoMinimo(Vertice origem, Vertice destino) {
         // Inicializa estruturas de dados para o algoritmo de Dijkstra
         Map<Vertice, Double> distancias = new HashMap<>();
@@ -217,13 +216,12 @@ public class Grafo {
             }
         }
 
-        // Reconstrói o caminho
+
         return reconstruirCaminho(origem, destino, predecessores);
     }
 
-    /**
-     * Reconstrói o caminho a partir do mapa de predecessores
-     */
+
+
     private List<Vertice> reconstruirCaminho(Vertice origem, Vertice destino, Map<Vertice, Vertice> predecessores) {
         LinkedList<Vertice> caminho = new LinkedList<>();
 
@@ -259,7 +257,6 @@ public class Grafo {
             }
         }
 
-        // Inicializa o mapa de arestas
         inicializarArestaMap();
     }
 }
