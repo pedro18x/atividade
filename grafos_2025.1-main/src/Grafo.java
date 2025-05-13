@@ -1,10 +1,13 @@
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.Getter;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @NoArgsConstructor
 @Setter
+@Getter
 public class Grafo {
     private boolean isDirecionado;
     private List<Vertice> vertices;
@@ -12,116 +15,251 @@ public class Grafo {
     private int ordem;
     private int tamanho;
 
-    public Grafo(boolean isDirecionado) {
-        this.isDirecionado = isDirecionado;
-    }
+    // Cache para acesso rápido às arestas
+    private Map<VerticesPar, Aresta> arestaMap;
 
-    public void setVertices(List<Vertice> vertices) {
-        this.vertices = vertices;
-        ordem = vertices.size();
-        // NOVA ADIÇÃO: Atualiza o flag isDirecionado em cada vértice
-        for (Vertice v : vertices) {
-            v.setIsDirecionado(isDirecionado);
+    /**
+     * Classe utilitária para pares de vértices
+     */
+    private static class VerticesPar {
+        private final Vertice v1;
+        private final Vertice v2;
+
+        public VerticesPar(Vertice v1, Vertice v2) {
+            this.v1 = v1;
+            this.v2 = v2;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            VerticesPar that = (VerticesPar) o;
+            return Objects.equals(v1, that.v1) && Objects.equals(v2, that.v2);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(v1, v2);
         }
     }
 
-    public void setArestas(List<Aresta> arestas) {
-        this.arestas = arestas;
-        tamanho = arestas.size();
-        // Se o grafo não é direcionado, verifica se deve ser convertido para direcionado
-        if (!isDirecionado) {
-            verificaDirecionado();
-        }
-        preencherAdjacencias();
-        // NOVA ADIÇÃO: Atualiza novamente o flag dos vértices após definir as arestas
-        for (Vertice v : vertices) {
-            v.setIsDirecionado(isDirecionado);
-        }
-    }
+    /**
+     * Inicializa o mapa de arestas para acesso rápido
+     */
+    private void inicializarArestaMap() {
+        arestaMap = new HashMap<>();
 
-    // NOVA ADIÇÃO: Metodo renomeado para preencherAdjacencias (corrigindo a nomenclatura)
-    public void preencherAdjacencias() {
         for (Aresta aresta : arestas) {
-            Vertice origem = aresta.getOrigem();
-            Vertice destino = aresta.getDestino();
-            avaliarGrausDosVertices(origem, destino);
+            arestaMap.put(new VerticesPar(aresta.getOrigem(), aresta.getDestino()), aresta);
 
-            if (isDirecionado) {
-                // Para grafo direcionado, adiciona o destino como adjacente do origem
-                origem.addAdjacencia(destino);
-            } else {
-                // Para grafo não-direcionado, os vértices são adjacentes mutuamente
-                origem.addAdjacencia(destino);
-                destino.addAdjacencia(origem);
+            // Para grafos não direcionados, adiciona também no sentido contrário
+            if (!isDirecionado) {
+                arestaMap.put(new VerticesPar(aresta.getDestino(), aresta.getOrigem()), aresta);
             }
         }
     }
 
-    private void avaliarGrausDosVertices(Vertice origem, Vertice destino) {
-        if (isDirecionado) {
-            origem.incrementaOutDegree();
-            destino.incrementaInDegree();
+    /**
+     * Retorna a aresta entre dois vértices, se existir
+     */
+    private Optional<Aresta> getAresta(Vertice origem, Vertice destino) {
+        if (arestaMap == null) {
+            inicializarArestaMap();
         }
-        // Em ambos os casos incrementa o grau
-        origem.incrementaGrau();
-        destino.incrementaGrau();
+
+        return Optional.ofNullable(arestaMap.get(new VerticesPar(origem, destino)));
     }
 
-    public void verificaDirecionado() {
-        for (int i = 0; i < arestas.size(); i++) {
-            Aresta arestaI = arestas.get(i);
-            if (isSelfLoop(arestaI)) {
-                defineComoDirecionado();
-                return;
+    /**
+     * NOVA ADIÇÃO: Verifica se existe um caminho simples do vértice de origem até o vértice de destino.
+     */
+    public boolean existeCaminhoSimples(Vertice origem, Vertice destino) {
+        Set<Vertice> visitados = new HashSet<>();
+        return dfsExisteCaminho(origem, destino, visitados);
+    }
+
+    /**
+     * Método auxiliar DFS otimizado
+     */
+    private boolean dfsExisteCaminho(Vertice atual, Vertice destino, Set<Vertice> visitados) {
+        // Caso base: encontrou o destino
+        if (atual.equals(destino)) {
+            return true;
+        }
+
+        visitados.add(atual);
+
+        // Usa streams para processar adjacências de forma mais concisa
+        return atual.getAdjacencias().stream()
+                .filter(vizinho -> !visitados.contains(vizinho))
+                .anyMatch(vizinho -> dfsExisteCaminho(vizinho, destino, visitados));
+    }
+
+    /**
+     * NOVA ADIÇÃO: Calcula o comprimento do caminho entre dois vértices.
+     */
+    public double calcularComprimentoCaminho(Vertice origem, Vertice destino, boolean ponderado) {
+        List<Vertice> caminho = encontrarCaminho(origem, destino);
+
+        if (caminho.isEmpty()) {
+            return -1;
+        }
+
+        // Para grafos não ponderados, retorna o número de arestas
+        if (!ponderado) {
+            return caminho.size() - 1;
+        }
+
+        // Para grafos ponderados
+        double comprimento = 0;
+        for (int i = 0; i < caminho.size() - 1; i++) {
+            Optional<Aresta> aresta = getAresta(caminho.get(i), caminho.get(i + 1));
+
+            if (aresta.isPresent()) {
+                comprimento += aresta.get().getPeso();
             }
-            for (int j = 0; j < arestas.size(); j++) {
-                if (i != j) {
-                    Aresta arestaJ = arestas.get(j);
-                    if (isViaMaoDupla(arestaI, arestaJ)) {
-                        defineComoDirecionado();
-                        return;
-                    } else if (isMesmoSentido(arestaI, arestaJ)) {
-                        defineComoDirecionado();
-                        return;
+        }
+
+        return comprimento;
+    }
+
+    /**
+     * Método auxiliar otimizado para encontrar um caminho entre dois vértices
+     */
+    private List<Vertice> encontrarCaminho(Vertice origem, Vertice destino) {
+        // BFS para encontrar o caminho mais curto em número de arestas
+        Map<Vertice, Vertice> predecessores = new HashMap<>();
+        Queue<Vertice> fila = new LinkedList<>();
+        Set<Vertice> visitados = new HashSet<>();
+
+        fila.add(origem);
+        visitados.add(origem);
+
+        while (!fila.isEmpty()) {
+            Vertice atual = fila.poll();
+
+            if (atual.equals(destino)) {
+                break;
+            }
+
+            for (Vertice vizinho : atual.getAdjacencias()) {
+                if (!visitados.contains(vizinho)) {
+                    visitados.add(vizinho);
+                    predecessores.put(vizinho, atual);
+                    fila.add(vizinho);
+                }
+            }
+        }
+
+        // Reconstruir o caminho
+        LinkedList<Vertice> caminho = new LinkedList<>();
+        Vertice atual = destino;
+
+        while (atual != null) {
+            caminho.addFirst(atual);
+            atual = predecessores.get(atual);
+        }
+
+        // Verifica se o caminho começa com a origem
+        return caminho.size() > 0 && caminho.getFirst().equals(origem) ? caminho : new LinkedList<>();
+    }
+
+    /**
+     * NOVA ADIÇÃO: Identificar o caminho de menor comprimento usando Dijkstra
+     */
+    public List<Vertice> encontrarCaminhoMinimo(Vertice origem, Vertice destino) {
+        // Inicializa estruturas de dados para o algoritmo de Dijkstra
+        Map<Vertice, Double> distancias = new HashMap<>();
+        Map<Vertice, Vertice> predecessores = new HashMap<>();
+        PriorityQueue<Vertice> filaPrioridade = new PriorityQueue<>(
+                Comparator.comparingDouble(v -> distancias.getOrDefault(v, Double.POSITIVE_INFINITY))
+        );
+
+        // Inicializar distâncias
+        vertices.forEach(v -> distancias.put(v, Double.POSITIVE_INFINITY));
+        distancias.put(origem, 0.0);
+
+        filaPrioridade.add(origem);
+
+        // Executa Dijkstra
+        while (!filaPrioridade.isEmpty()) {
+            Vertice atual = filaPrioridade.poll();
+
+            // Se chegou ao destino
+            if (atual.equals(destino)) {
+                break;
+            }
+
+            // Se a distância for infinita, não há mais caminhos
+            if (distancias.get(atual) == Double.POSITIVE_INFINITY) {
+                break;
+            }
+
+            // Relaxamento das arestas
+            for (Vertice vizinho : atual.getAdjacencias()) {
+                Optional<Aresta> arestaOpt = getAresta(atual, vizinho);
+
+                if (arestaOpt.isPresent()) {
+                    double peso = arestaOpt.get().getPeso();
+                    double novaDistancia = distancias.get(atual) + peso;
+
+                    if (novaDistancia < distancias.get(vizinho)) {
+                        // Atualiza distância
+                        distancias.put(vizinho, novaDistancia);
+                        predecessores.put(vizinho, atual);
+
+                        // Atualiza a fila
+                        filaPrioridade.remove(vizinho);
+                        filaPrioridade.add(vizinho);
                     }
                 }
             }
         }
+
+        // Reconstrói o caminho
+        return reconstruirCaminho(origem, destino, predecessores);
     }
 
-    private boolean isMesmoSentido(Aresta i, Aresta j) {
-        return i.getOrigem() == j.getOrigem() && i.getDestino() == j.getDestino();
+    /**
+     * Reconstrói o caminho a partir do mapa de predecessores
+     */
+    private List<Vertice> reconstruirCaminho(Vertice origem, Vertice destino, Map<Vertice, Vertice> predecessores) {
+        LinkedList<Vertice> caminho = new LinkedList<>();
+
+        // Se o destino não foi alcançado
+        if (!predecessores.containsKey(destino) && !origem.equals(destino)) {
+            return caminho;
+        }
+
+        // Reconstrói o caminho
+        for (Vertice atual = destino; atual != null; atual = predecessores.get(atual)) {
+            caminho.addFirst(atual);
+        }
+
+        return caminho;
     }
 
-    private void defineComoDirecionado() {
-        isDirecionado = true;
-    }
-
-    private boolean isViaMaoDupla(Aresta arestaAlvo, Aresta arestaInterna) {
-        return arestaAlvo.getOrigem() == arestaInterna.getDestino()
-                && arestaAlvo.getDestino() == arestaInterna.getOrigem();
-    }
-
-    private boolean isSelfLoop(Aresta arestaAlvo) {
-        return arestaAlvo.getOrigem() == arestaAlvo.getDestino();
-    }
-
-    @Override
-    public String toString() {
-        // NOVA ADIÇÃO: Metodo toString() reformulado para exibir de forma organizada as informações do grafo
-        StringBuilder sb = new StringBuilder();
-        sb.append("Grafo:\n");
-        sb.append("Direcionado: ").append(isDirecionado).append("\n");
-        sb.append("Ordem: ").append(ordem).append("\n");
-        sb.append("Tamanho: ").append(tamanho).append("\n");
-        sb.append("Vertices:\n");
+    /**
+     * Método para manter as adjacências atualizadas
+     */
+    public void preencherAdjacencias() {
+        // Limpa adjacências existentes
         for (Vertice v : vertices) {
-            sb.append(v.toString()).append("\n");
+            v.setAdjacencias(new ArrayList<>());
         }
-        sb.append("Arestas:\n");
-        for (Aresta a : arestas) {
-            sb.append(a.toString()).append("\n");
+
+        // Preenche novas adjacências
+        for (Aresta aresta : arestas) {
+            aresta.getOrigem().getAdjacencias().add(aresta.getDestino());
+
+            // Para grafos não direcionados, adiciona também no sentido contrário
+            if (!isDirecionado) {
+                aresta.getDestino().getAdjacencias().add(aresta.getOrigem());
+            }
         }
-        return sb.toString();
+
+        // Inicializa o mapa de arestas
+        inicializarArestaMap();
     }
 }

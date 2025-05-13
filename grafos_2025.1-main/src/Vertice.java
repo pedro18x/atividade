@@ -11,13 +11,15 @@ public class Vertice {
     private int grau; // para grafos não-direcionados
     private int inDegree;
     private int outDegree;
-
-    // NOVA ADIÇÃO: Flag para identificar se o vértice pertence a um grafo direcionado,
-    // permitindo exibir inDegree/outDegree quando necessário.
     private boolean isDirecionado;
 
     public Vertice(String nome) {
         this.nome = nome;
+    }
+
+    // Método manual para garantir compatibilidade
+    public String getNome() {
+        return this.nome;
     }
 
     public void addAdjacencia(Vertice vertice) {
@@ -54,6 +56,7 @@ public class Vertice {
     }
 
     public void setIsDirecionado(boolean isDirecionado) {
+        this.isDirecionado = isDirecionado;
     }
 
     public void setDirecionado(boolean direcionado) {
